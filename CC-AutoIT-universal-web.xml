@@ -1,0 +1,23 @@
+    <ConnectionComponent Id="AutoIT-universal-web" FullScreen="No" Height="768" Width="1024" EnableWindowScrollbar="No" EnableToolbars="No" DisplayName="AutoIT-universal-web" Type="CyberArk.PasswordVault.TransparentConnection.PSM.PSMConnectionComponent, CyberArk.PasswordVault.TransparentConnection.PSM">
+      <ComponentParameters />
+      <UserParameters>
+        <Parameter Name="AllowMappingLocalDrives" Type="CyberArk.TransparentConnection.BooleanUserParameter, CyberArk.PasswordVault.TransparentConnection" Value="No" Visible="Yes" Required="No" EnforceInDualControlRequest="No" />
+      </UserParameters>
+      <TargetSettings Protocol="Chrome" ClientApp="dummy.exe" ClientDispatcher="&quot;{PSMComponentsFolder}\AutoIT-universal-web_PSM.exe&quot; &quot;{PSMComponentsFolder}&quot;" ClientInvokeType="Dispatcher" ConnectionComponentInitTimeout="90000">
+        <ClientSpecific>
+          <Parameter Name="ActionTimeout" Value="10" />
+          <Parameter Name="PageLoadTimeout" Value="30" />
+          <Parameter Name="RunValidations" Value="Yes" />
+		  <Parameter Name="WaitBeforeCmdlineParmsHide" Value="20000" />
+		  <Parameter Name="CmdLineParmsHideTimeout" Value="30000" />
+		  <Parameter Name="EnableTrace" Value="Yes" />
+        </ClientSpecific>
+        <LockAppWindow Enable="No" MainWindowClass="::DesktopWindow" Timeout="800000" SearchWindowWaitTimeout="30" />
+        <Capabilities>
+          <Capability Id="WindowsEventsAudit" />
+          <Capability Id="WindowsEventsTextRecorder" />
+		  <Capability Id="KeystrokesAudit" />
+		  <Capability Id="KeystrokesTextRecorder" />
+        </Capabilities>
+      </TargetSettings>
+    </ConnectionComponent>
