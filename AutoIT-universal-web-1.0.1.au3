@@ -86,6 +86,7 @@ Global $WebSuffix = "/PasswordVault/v10/" ; CHANGE_ME - everything after the add
 ; If autologin is set to yes - the script will try to login automatically
 ; If autologin is set to no - the script end when login page is loaded successfully and user may interact with the page
 ; If you set autologin to no - some of the varables below are not important in your case, but they shoud have some value anyway to avoid unexpected errors
+; Even if autologin is set to no - Cyberark account under your platform must contain username and password also in this case, but they are not used in the script
 Global Const $AutoLogin = "yes" ; CHANGE_ME - yes or no
 ; Verification mode
 ; title = Use window titles to verify if login page was loaded and login was successful
