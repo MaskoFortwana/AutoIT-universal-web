@@ -88,6 +88,10 @@ Global $WebSuffix = "/PasswordVault/v10/" ; CHANGE_ME - everything after the add
 ; If you set autologin to no - some of the varables below are not important in your case, but they shoud have some value anyway to avoid unexpected errors
 ; Even if autologin is set to no - Cyberark account under your platform must contain username and password also in this case, but they are not used in the script
 Global Const $AutoLogin = "yes" ; CHANGE_ME - yes or no
+; Authentication mode
+; Basic - sends username and password in URL
+; Form - autotypes username and password on logon page in username and password field
+Global Const $AuthenticationMode = "basic" ; CHANGE_ME - basic or form
 ; Verification mode
 ; title = Use window titles to verify if login page was loaded and login was successful
 ; color = Use PixelSearch function to verify if login page was loaded and login was successful
@@ -156,7 +160,11 @@ FetchSessionProperties()
 
 ; Phase 1 start - execute client application
 LogWrite("INFO: starting client application - " & $DISPATCHER_NAME)
-Global Const $CLIENT_EXECUTABLE = $connect & $WebPrefix & $TargetAddress & $WebSuffix
+If $AuthenticationMode = "basic" Then
+    Global Const $CLIENT_EXECUTABLE = $connect & $WebPrefix & $TargetUsername & ":" & $TargetPassword & "@" & $TargetAddress & $WebSuffix
+ElseIf $AuthenticationMode = "form" Then
+    Global Const $CLIENT_EXECUTABLE = $connect & $WebPrefix & $TargetAddress & $WebSuffix
+EndIf
 $ConnectionClientPID = Run($CLIENT_EXECUTABLE,  "", @SW_SHOWMAXIMIZED)
 ; StringReplace makes sure that password value is not logged in case you are using basic authentication sending password in URL
 $logMessage = StringReplace($CLIENT_EXECUTABLE, $TargetPassword, "****") 
@@ -168,8 +176,8 @@ EndIf
 ; Phase 1 end
 
 ; Phase 2 start
-If $VerificationMode = "title" Then
-    LogWrite("INFO: Verification mode is set to title - using window titles to verify login success")
+If $VerificationMode = "title" And $AuthenticationMode = "form" Then
+    LogWrite("INFO: Verification mode is set to title - using window titles to verify login success and login type is form")
         ; Login process - START
         ; Window names
         $window1 = $PAGE_LOADED_TITLE
@@ -182,6 +190,7 @@ If $VerificationMode = "title" Then
 
         ; If AutoLogin is set to yes, proceed as normal
         If $AutoLogin = "yes" Then
+            LogWrite("INFO: Autologin is set to yes...")
             ;Wait for window no 1
             LogWrite("INFO: Waiting for window - " & $window1)
             WinWait($window1, "", $AppTimeout)
@@ -219,7 +228,7 @@ If $VerificationMode = "title" Then
                 ; Log an error message if the window is not found
                 $currentTime = @HOUR & ":" & @MIN & ":" & @SEC & " " & @MDAY & "/" & @MON & "/" & @YEAR
                 $errorMsg = "ERROR: " & $DISPATCHER_NAME & " failed at automatic logon phase 2 " 
-                $errorMsg &= $window1 & " Window Title did not show up in app timeout seconds value " 
+                $errorMsg &= "Window Title - " & $window1 & " - did not show up in app timeout seconds value " 
                 $errorMsg &= $AppTimeout & " session details: " 
                 $errorMsg &= $ConnectionComponent_NAME & "/" & $TargetUsername & "/" & $TargetAddress & "/" & $currentTime
                 $errorMsg &= "Phase 2 - title - step 1"
@@ -272,12 +281,13 @@ If $VerificationMode = "title" Then
                 Exit
             EndIf
         ElseIf $AutoLogin = "no" Then
+            LogWrite("INFO: Autologin is set to no...")
             ;Wait for window no 1
             LogWrite("INFO: Waiting for window - " & $window1)
             WinWait($window1, "", $AppTimeout)
             $ActiveWindow = WinGetTitle("[ACTIVE]")
             LogWrite("INFO: Current window title is " & $ActiveWindow)
-            ;If window is active, perform login process
+            ;If window is active, allow user to interact with the page
             If WinExists($window1) Then
                 LogWrite("INFO: Window - " & $window1 & " found, web is loaded, skipping autologin based on $AutoLogin is set to no...")
                 $Window1RealTitle = WinGetTitle("[ACTIVE]")
@@ -307,8 +317,10 @@ If $VerificationMode = "title" Then
                 Exit 
             EndIf
         EndIf
-ElseIf $VerificationMode = "color" Then
+ElseIf $VerificationMode = "color" And $AuthenticationMode = "form" Then
+    LogWrite("INFO: Verification mode is set to color and authentication mode is form - using colors to verify login success")
     If $AutoLogin = "yes" Then
+        LogWrite("INFO: Autologin is set to yes...")
         ; Login process - START
         ; Window names
         ; Google chrome auth window - used just to verify if google chrome is running
@@ -394,7 +406,7 @@ ElseIf $VerificationMode = "color" Then
             ; Log an error message if the window is not found
             $currentTime = @HOUR & ":" & @MIN & ":" & @SEC & " " & @MDAY & "/" & @MON & "/" & @YEAR
             $errorMsg = "ERROR: " & $DISPATCHER_NAME & " failed at automatic logon phase 2 " 
-            $errorMsg &= $window1 & " Window Title did not show up in app timeout seconds value " 
+            $errorMsg &= "Window Title - " & $window1 & " - did not show up in app timeout seconds value " 
             $errorMsg &= $AppTimeout & " session details: " 
             $errorMsg &= $ConnectionComponent_NAME & "/" & $TargetUsername & "/" & $TargetAddress & "/" & $currentTime
             $errorMsg &= "Phase 2 - color - step 1 - color " & $PAGE_LOADED_COLOR " not found"
@@ -490,12 +502,13 @@ ElseIf $VerificationMode = "color" Then
             Exit
         EndIf
     ElseIf $AutoLogin = "no" Then
+        LogWrite("INFO: Autologin is set to no...")
         ; Window names
         ; Google chrome auth window - used just to verify if google chrome is running
         $window1 = "Google Chrome" ;CHANGE_ME - only if you are using different browser
         ; Logging
         LogWrite("INFO: Window1 is identified as " & $window1)
-        LogWrite("INFO: Login process starting...")
+        LogWrite("INFO: Skipping autologin, veryfiyng only the page is loaded...")
         ;Wait for window no 1
         LogWrite("INFO: Waiting for " & $window1)
         WinWait($window1, "", $AppTimeout)
@@ -514,7 +527,7 @@ ElseIf $VerificationMode = "color" Then
                 If Not @error Then
                     ; Exit loop after specified color appears
                     LogWrite("INFO: Page loaded successfully - PixelSearch found specified color - " & $PAGE_LOADED_COLOR)
-                    SplashTextOn($ConnectionComponent_NAME, $ConnectionComponent_NAME & " Page loaded successfully, proceeding to login...", $iScreenWidth, $iScreenHeight); Create a splash screen
+                    SplashTextOn($ConnectionComponent_NAME, $ConnectionComponent_NAME & " Page loaded successfully, proceeding to next step...", $iScreenWidth, $iScreenHeight); Create a splash screen
                     ExitLoop
                 EndIf
                 If TimerDiff($startTime) > $AppTimeout * 1000 Then ; Convert timeout to milliseconds
@@ -574,6 +587,151 @@ ElseIf $VerificationMode = "color" Then
             LogWrite("INFO: Closing active window - " & $ActiveWindow)
             Exit
         EndIf
+    EndIf
+ElseIf $VerificationMode = "title" And $AuthenticationMode = "basic" Then
+    LogWrite("INFO: Verification mode is set to title - using titles to verify login success")
+    LogWrite("INFO: Authentication mode is set to basic - sending username and password in URL")
+    ;Wait for window no 1
+    $window1 = "Google Chrome"
+    $window2 = $LOGIN_SUCCESS_TITLE
+    LogWrite("INFO: Waiting for window - " & $window1)
+    WinWait($window1, "", $AppTimeout)
+    $ActiveWindow = WinGetTitle("[ACTIVE]")
+    LogWrite("INFO: Current window title is " & $ActiveWindow)
+    ;If window is active, verify login success
+    If WinExists($window1) Then
+        LogWrite("INFO: Window - " & $window1 & " found, web is loaded, tryied login with basic auth, proceeding with login verification...")
+        $Window1RealTitle = WinGetTitle("[ACTIVE]")
+        ; Bring the window to the front
+        WinActivate($window1)
+        LogWrite("INFO: Chrome real title is " & $Window1RealTitle)
+    Else
+        ; Log an error message if the window is not found
+        $currentTime = @HOUR & ":" & @MIN & ":" & @SEC & " " & @MDAY & "/" & @MON & "/" & @YEAR
+        $errorMsg = "ERROR: " & $DISPATCHER_NAME & " failed at automatic logon phase 2 " 
+        $errorMsg &= $window1 & " Window Title did not show up in app timeout seconds value " 
+        $errorMsg &= $AppTimeout & " session details: " 
+        $errorMsg &= $ConnectionComponent_NAME & "/" & $TargetUsername & "/" & $TargetAddress & "/" & $currentTime
+        $errorMsg &= "Phase 2 - title - step 1"
+        LogWrite($errorMsg)
+        ; Display an error message if the window is not found
+        $errorMsg = "Sorry, CyberArk could not start requested application. Contact CyberArk administrator/support. "
+        $errorMsg &= "Please screenshot this error and attach as information for faster resolution. Thanks! "
+        $errorMsg &= "ERROR: " & $DISPATCHER_NAME & " failed at automatic logon phase 2 " & $window1 & " not found "
+        $errorMsg &= "session details: " & $ConnectionComponent_NAME & "/" & $TargetUsername & "/" & $TargetAddress & "/" & $currentTime
+        $errorMsg &= "Phase 2 - title - step 1"
+        SplashTextOn("Error", $errorMsg, $iScreenWidth, $iScreenHeight)
+        Sleep(30000)
+        WinClose($ActiveWindow)
+        Exit 
+    EndIf
+    ;Wait for window no 2
+    ;If window is active, login is considered successful
+    LogWrite("INFO: Waiting for window - " & $window2)
+    WinWait($window2, "", $AppTimeout)
+    $ActiveWindow = WinGetTitle("[ACTIVE]")
+    LogWrite("INFO: Current window title is " & $ActiveWindow)
+    If WinExists($window2) Then
+            ; Bring the window to the front
+            WinActivate($window2)
+            $Window2RealTitle = WinGetTitle("[ACTIVE]")
+            LogWrite("INFO: Chrome real title is " & $Window2RealTitle)
+            LogWrite("INFO: Login process finished, login success verified")
+            LogWrite("INFO: Removing splashscreen, user may interact with webpage now ")
+            SplashOff(); Remove the splash screen
+    Else
+        ; Log an error message if the window is not found
+        $currentTime = @HOUR & ":" & @MIN & ":" & @SEC & " " & @MDAY & "/" & @MON & "/" & @YEAR
+        $errorMsg = "ERROR: " & $DISPATCHER_NAME & " failed at automatic logon phase 2 " 
+        $errorMsg &= $window1 & " Window Title did not show up in app timeout seconds value " 
+        $errorMsg &= $AppTimeout & " session details: " 
+        $errorMsg &= $ConnectionComponent_NAME & "/" & $TargetUsername & "/" & $TargetAddress & "/" & $currentTime
+        $errorMsg &= "Phase 2 - title - step 2"
+        LogWrite($errorMsg)
+        ; Display an error message if the window is not found
+        $errorMsg = "Sorry, CyberArk could not start requested application. Contact CyberArk administrator/support. "
+        $errorMsg &= "Please screenshot this error and attach as information for faster resolution. Thanks! "
+        $errorMsg &= "ERROR: " & $DISPATCHER_NAME & " failed at automatic logon phase 2 " & $window2 & " not found "
+        $errorMsg &= "session details: " & $ConnectionComponent_NAME & "/" & $TargetUsername & "/" & $TargetAddress & "/" & $currentTime
+        $errorMsg &= "Phase 2 - title - step 2"
+        SplashTextOn("Error", $errorMsg, $iScreenWidth, $iScreenHeight)
+        Sleep(30000)
+        WinClose($ActiveWindow)
+        Exit
+    EndIf
+ElseIf $VerificationMode = "color" And $AuthenticationMode = "basic" Then
+    LogWrite("INFO: Verification mode is set to color and authentication mode is basic - using colors to verify login success")
+    ;Wait for window no 1
+    $window1 = "Google Chrome"
+    LogWrite("INFO: Waiting for window - " & $window1)
+    WinWait($window1, "", $AppTimeout)
+    $ActiveWindow = WinGetTitle("[ACTIVE]")
+    LogWrite("INFO: Current window title is " & $ActiveWindow)
+    ;If window is active, verify login success
+    If WinExists($window1) Then
+            LogWrite("INFO: Login window" & $window1 & " found, checking if login was successful")
+            ; Bring the window to the front
+                    WinActivate($window1)
+                    LogWrite("INFO: Window - " & $window1 & " found, web is loaded, tryied login with basic auth, proceeding with login verification...")
+                    LogWrite("INFO: Waiting until logged in main page loads - using PixelSearch and $LOGIN_SUCCESS_COLOR - " & $LOGIN_SUCCESS_COLOR)
+                    SplashOff(); Remove the splash screen
+                    Local $startTime = TimerInit()
+                        While True
+                            $colorFound = PixelSearch(0, 0, @DesktopWidth, @DesktopHeight, $LOGIN_SUCCESS_COLOR)
+                            If Not @error Then
+                                ; Exit loop after specified color appears
+                                LogWrite("INFO: Page loaded successfully - PixelSearch found specified color - " & $LOGIN_SUCCESS_COLOR)
+                                SplashOff(); Remove the splash screen
+                                ExitLoop
+                            EndIf
+                            If TimerDiff($startTime) > $AppTimeout * 1000 Then ; Convert timeout to milliseconds
+                                ; Log an error message if the window is not found
+                                $currentTime = @HOUR & ":" & @MIN & ":" & @SEC & " " & @MDAY & "/" & @MON & "/" & @YEAR
+                                $errorMsg = "ERROR: " & $DISPATCHER_NAME & " failed at automatic logon phase 2 " 
+                                $errorMsg &= $LOGIN_SUCCESS_COLOR & " Color did not show up in app timeout seconds value " 
+                                $errorMsg &= $AppTimeout & " session details: " 
+                                $errorMsg &= $ConnectionComponent_NAME & "/" & $TargetUsername & "/" & $TargetAddress & "/" & $currentTime
+                                $errorMsg &= "Phase 2 - color - step 2 - color loop"
+                                LogWrite($errorMsg)
+                                ; Display an error message if the window is not found
+                                $errorMsg = "Sorry, CyberArk could not start requested application. Contact CyberArk administrator/support. "
+                                $errorMsg &= "Please screenshot this error and attach as information for faster resolution. Thanks! "
+                                $errorMsg &= "ERROR: " & $DISPATCHER_NAME & " failed at automatic logon phase 2 " & $LOGIN_SUCCESS_COLOR & " color not found "
+                                $errorMsg &= "session details: " & $ConnectionComponent_NAME & "/" & $TargetUsername & "/" & $TargetAddress & "/" & $currentTime
+                                $errorMsg &= "Phase 2 - color - step 2 - color loop"
+                                SplashTextOn("Error", $errorMsg, $iScreenWidth, $iScreenHeight)
+                                Sleep(30000)
+                                $ActiveWindow = WinGetTitle("[ACTIVE]")
+                                LogWrite("INFO: Current window title is " & $ActiveWindow)
+                                WinClose($ActiveWindow)
+                                LogWrite("INFO: Closing active window - " & $ActiveWindow)
+                                ExitLoop
+                                Exit
+                            EndIf
+                            Sleep(1000) ; Wait for 1 second before checking again
+                        WEnd
+    Else
+        ; Log an error message if the window is not found
+        $currentTime = @HOUR & ":" & @MIN & ":" & @SEC & " " & @MDAY & "/" & @MON & "/" & @YEAR
+        $errorMsg = "ERROR: " & $DISPATCHER_NAME & " failed at automatic logon phase 2 " 
+        $errorMsg &= $window1 & " Window Title did not show up in app timeout seconds value " 
+        $errorMsg &= $AppTimeout & " session details: " 
+        $errorMsg &= $ConnectionComponent_NAME & "/" & $TargetUsername & "/" & $TargetAddress & "/" & $currentTime
+        $errorMsg &= "Phase 2 - color - step 2 - color - cannot found " & $window1 & " after tryied to login"
+        LogWrite($errorMsg)
+        ; Display an error message if the window is not found
+        $errorMsg = "Sorry, CyberArk could not start requested application. Contact CyberArk administrator/support. "
+        $errorMsg &= "Please screenshot this error and attach as information for faster resolution. Thanks! "
+        $errorMsg &= "ERROR: " & $DISPATCHER_NAME & " failed at automatic logon phase 2 " & $window1 & " not found "
+        $errorMsg &= "session details: " & $ConnectionComponent_NAME & "/" & $TargetUsername & "/" & $TargetAddress & "/" & $currentTime
+        $errorMsg &= "Phase 2 - color - step 2 - color - cannot found " & $window1 & " after tryied to login"
+        SplashTextOn("Error", $errorMsg, $iScreenWidth, $iScreenHeight)
+        Sleep(30000)
+        $ActiveWindow = WinGetTitle("[ACTIVE]")
+        LogWrite("INFO: Current window title is " & $ActiveWindow)
+        WinClose($ActiveWindow)
+        LogWrite("INFO: Closing active window - " & $ActiveWindow)
+        Exit
     EndIf
 EndIf
 ; Phase 2 end
